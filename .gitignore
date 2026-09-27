@@ -1,0 +1,17 @@
+# Downloaded only to regenerate icons.json — see tools-generate-icons.js
+lucide-nodes.json
+lucide-tags.json
+
+# macOS
+.DS_Store
+
+node_modules/
+*.zip
+
+# Build-Ausgabe
+dist/
+
+# Private — kept locally, not published
+SPEC.md
+store/
+.history/

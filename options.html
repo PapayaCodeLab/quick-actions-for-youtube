@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Quick Actions for YouTube — Settings</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #fff;
+      --fg: #0f0f0f;
+      --muted: #606060;
+      --line: rgba(0, 0, 0, 0.1);
+      --accent: #f00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f0f;
+        --fg: #f1f1f1;
+        --muted: #aaa;
+        --line: rgba(255, 255, 255, 0.15);
+      }
+    }
+    body {
+      margin: 0;
+      padding: 32px 24px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 14px/1.5 'Roboto', 'Segoe UI', -apple-system, Arial, sans-serif;
+    }
+    main { max-width: 560px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 28px; }
+    section { border-top: 1px solid var(--line); padding: 18px 0; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em;
+         color: var(--muted); margin: 0 0 14px; }
+    .row { display: flex; align-items: flex-start; gap: 14px; padding: 8px 0; }
+    .row label { flex: 1; cursor: pointer; }
+    .row .hint { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+    input[type="checkbox"] {
+      appearance: none; width: 40px; height: 22px; border-radius: 11px;
+      background: var(--line); position: relative; cursor: pointer;
+      flex: none; margin: 2px 0 0; transition: background .15s;
+    }
+    input[type="checkbox"]::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%; background: var(--bg);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .15s;
+    }
+    input[type="checkbox"]:checked { background: var(--accent); }
+    input[type="checkbox"]:checked::after { transform: translateX(18px); }
+    /* The gap above this rule matches the one between the two sections:
+       8px row padding + 18px section padding. */
+    .tail { padding-top: 18px; border-top: 1px solid var(--line); }
+    .stats { margin: 0 0 30px; font-size: 13.5px; color: var(--muted); }
+    .stats b { color: var(--accent); font-weight: 600; }
+
+    /* Banner and QR sit in one row with the same padding on all four sides. */
+    .coffee { padding: 22px; border-radius: 14px; border: 1px solid var(--line); }
+    .coffee .pitch { margin: 0; font-size: 14px; line-height: 1.5; }
+    .coffee .pitch a { color: #c99400; font-weight: 600; text-decoration: none;
+                       white-space: nowrap; }
+    .coffee .pitch a:hover { text-decoration: underline; }
+    /* Bottom-aligned: the QR is taller than the button, and the space it
+       needs is free anyway — the text above it only fills the left half. */
+    .coffee-row { display: flex; align-items: flex-end;
+                  justify-content: space-between; gap: 20px; margin-top: 22px; }
+    .bmc, .qr { display: block; line-height: 0; border-radius: 10px;
+                transition: transform .12s, box-shadow .12s; }
+    .bmc:hover, .qr:hover { transform: translateY(-1px);
+                            box-shadow: 0 4px 14px rgba(255, 221, 0, .45); }
+    .bmc img { display: block; height: 52px; width: auto; border-radius: 9px; }
+    .qr img { display: block; height: 96px; width: 96px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Quick Actions for YouTube</h1>
+    <p class="sub">Everything is stored locally on this device. No data ever leaves your browser.</p>
+
+    <section>
+      <h2>Appearance</h2>
+      <div class="row">
+        <input type="checkbox" id="alwaysShow">
+        <label for="alwaysShow">Always show the icons
+          <span class="hint">Off: the icons appear when you hover a video.</span>
+        </label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="showNames">
+        <label for="showNames">Show playlist names under the icons
+          <span class="hint">Only on the watch history page — playlist rows have no room for labels.</span>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Where to show the quick-save icons</h2>
+      <div class="row">
+        <input type="checkbox" id="showOnPlaylists">
+        <label for="showOnPlaylists">Playlist pages</label>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="showOnWatchLater">
+        <label for="showOnWatchLater">Watch later</label>
+      </div>
+    </section>
+
+
+
+    <div class="tail">
+      <p class="stats" id="stats" hidden></p>
+
+      <aside class="coffee">
+        <p class="pitch">No ads, no tracking, no subscription. Just a developer
+          who runs on coffee. <a href="https://buymeacoffee.com/papayacode" target="_blank" rel="noopener"
+          >Buy me one →</a></p>
+        <div class="coffee-row">
+          <a class="bmc" href="https://buymeacoffee.com/papayacode" target="_blank" rel="noopener">
+            <img src="assets/bmc-button.png" alt="Buy me a coffee">
+          </a>
+          <a class="qr" href="https://buymeacoffee.com/papayacode" target="_blank" rel="noopener">
+            <img src="assets/bmc-qr.png" alt="Buy me a coffee — QR code">
+          </a>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+:root{color-scheme:light dark;--bg:#fff;--fg:#111;--muted:#5a5a5a;--line:rgba(0,0,0,.12);--accent:#e00}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0f0f;--fg:#eee;--muted:#a0a0a0;--line:rgba(255,255,255,.15);--accent:#ff3b30}}
+*{box-sizing:border-box}
+body{margin:0;padding:56px 20px 80px;background:var(--bg);color:var(--fg);
+  font:16px/1.65 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+main{max-width:660px;margin:0 auto}
+img.logo{width:72px;height:72px;display:block;margin-bottom:22px}
+h1{font-size:30px;line-height:1.2;letter-spacing:-.02em;margin:0 0 6px}
+h2{font-size:19px;margin:38px 0 10px;padding-top:18px;border-top:1px solid var(--line)}
+.sub{color:var(--muted);margin:0 0 8px}
+ul{padding-left:22px}li{margin:6px 0}
+a{color:var(--accent)}
+code{background:var(--line);padding:1px 5px;border-radius:4px;font-size:.9em}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+
+/* "Add to Chrome" — a filled pill once the store link exists, an outline until then */
+.cta{display:inline-block;margin:10px 0 6px;padding:11px 22px;border-radius:999px;
+  background:var(--accent);color:#fff;font-weight:600;text-decoration:none}
+.cta:hover{filter:brightness(1.08)}
+.cta-soon{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500}
+ul.features li{margin:10px 0}
+kbd{font:600 .85em ui-monospace,SFMono-Regular,Menlo,monospace;padding:1px 6px;
+  border:1px solid var(--line);border-bottom-width:2px;border-radius:5px}

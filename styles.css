@@ -1,0 +1,724 @@
+/* ====================================================================
+   Theme handling
+   YouTube sets html[dark] on nothing and colours only its text elements —
+   html, body and the row containers stay black even in the dark theme, so
+   inheriting is not enough. content.js measures the colour of a real video
+   title and publishes it as --yqa-fg; everything here uses that, and
+   derives hover and fill tints from it with color-mix().
+   ==================================================================== */
+
+.yqa-btn,
+.yqa-trash-fallback,
+.yqa-mini-btn,
+.yqa-bar-btn,
+.yqa-picker,
+.yqa-picker-cell,
+.yqa-picker-tab,
+.yqa-picker-mode,
+.yqa-picker-search,
+.yqa-picker-remove {
+  color: var(--yqa-fg, currentColor);
+}
+
+/* ====================================================================
+   Trash button
+   On lockup rows it is a clone of YouTube's own overflow button, so its
+   look comes from YouTube's classes and only the position is set here.
+   The fallback rebuilds that look for the legacy playlist row layout.
+   ==================================================================== */
+
+.ytLockupMetadataViewModelMenuButton .yqa-btn.yqa-right-of-dots {
+  position: absolute;
+  left: 100%;
+  top: 0;
+}
+
+/* The cloned sidebar control keeps YouTube's own filled-circle styling;
+   only its icon is swapped, so nothing here may override its colours. */
+.yqa-bulk-btn {
+  /* YouTube's own controls already carry an 8px right margin, so adding one
+     here would double the gap. */
+  margin-left: 0;
+}
+
+.yqa-corner-host {
+  position: relative;
+}
+
+/* Downloads and liked videos. Permanently visible, like the trash button on
+   the history page — hiding it until hover made the two look inconsistent. */
+.yqa-btn.yqa-corner,
+.yqa-trash-fallback.yqa-corner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.yqa-menu-host {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+/* Legacy playlist rows lay their metadata out as blocks; a flex column
+   keeps the same visual result but lets the bar centre itself. */
+.yqa-meta-host {
+  display: flex;
+  flex-direction: column;
+}
+
+.yqa-trash-fallback {
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.yqa-trash-fallback:hover,
+.yqa-trash-fallback:focus-visible {
+  background-color: rgba(128, 128, 128, 0.3);
+  background-color: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.yqa-trash-fallback svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.yqa-btn svg,
+.yqa-trash-fallback svg {
+  fill: currentColor;
+  pointer-events: none;
+}
+
+/* While a native menu is driven programmatically, keep it invisible so
+   nothing flashes. Only active for a few hundred milliseconds. */
+html.yqa-hide-popup ytd-popup-container tp-yt-iron-dropdown,
+html.yqa-hide-popup ytd-popup-container tp-yt-paper-dialog {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+/* ====================================================================
+   Pin & icon controls in the native "Save to…" dialog
+   ==================================================================== */
+
+.yqa-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+
+.yqa-mini-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  opacity: 0.75;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.yqa-mini-btn:hover,
+.yqa-mini-btn:focus-visible {
+  opacity: 1;
+  background-color: rgba(128, 128, 128, 0.25);
+  background-color: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+.yqa-mini-btn svg {
+  fill: currentColor;
+  pointer-events: none;
+  display: block;
+}
+
+.yqa-pin-btn.yqa-pinned {
+  opacity: 1;
+}
+
+.yqa-emoji-char {
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Tooltip / hint bubble, styled like YouTube's own tooltips. */
+.yqa-hint {
+  position: fixed;
+  z-index: 10001;
+  background: #616161;
+  color: #fff;
+  font-size: 12px;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  line-height: 16px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  max-width: 260px;
+  pointer-events: none;
+}
+
+/* ====================================================================
+   Icon & emoji picker
+   ==================================================================== */
+
+.yqa-picker {
+  position: fixed;
+  /* anchor for the crop editor */
+  z-index: 10000;
+  width: 316px;
+  /* The surface colour is copied from YouTube's own dialog at runtime, so
+     it matches whichever theme is active. */
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 32px 0 rgba(0, 0, 0, 0.35);
+  padding: 10px;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yqa-picker-search {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid;
+  border-color: rgba(128, 128, 128, 0.4);
+  border-color: color-mix(in srgb, currentColor 30%, transparent);
+  background: transparent;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.yqa-picker-search:focus {
+  border-color: #3ea6ff;
+}
+
+/* Mode switch (Icons / Emoji), styled like YouTube's chips. */
+.yqa-picker-modes {
+  display: flex;
+  gap: 6px;
+}
+
+.yqa-picker-mode {
+  flex: 1;
+  height: 30px;
+  border: none;
+  outline: none;
+  background: rgba(128, 128, 128, 0.2);
+  /* The picker sets these two from YouTube's menu colour when it opens, a
+     clear step lighter than its own surface. */
+  background: var(--yqa-chip-bg, color-mix(in srgb, currentColor 12%, transparent));
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 0 10px;
+}
+
+.yqa-picker-mode.yqa-active {
+  background: #ff0034;
+  color: #fff;
+}
+
+.yqa-picker-tabs {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.yqa-picker-tab {
+  flex: 1;
+  height: 30px;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yqa-picker-tab:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.18);
+  background: var(--yqa-chip-bg, color-mix(in srgb, currentColor 10%, transparent));
+}
+
+.yqa-picker-tab.yqa-active {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.3);
+  background: var(--yqa-chip-bg-hover, color-mix(in srgb, currentColor 18%, transparent));
+}
+
+.yqa-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-height: 216px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.yqa-picker-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yqa-picker-cell-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.yqa-picker-cell:hover,
+.yqa-picker-cell:focus-visible {
+  background: rgba(128, 128, 128, 0.3);
+  background: var(--yqa-chip-bg-hover, color-mix(in srgb, currentColor 18%, transparent));
+}
+
+.yqa-picker-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 16px 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.yqa-picker-remove {
+  border: none;
+  outline: none;
+  background: rgba(128, 128, 128, 0.2);
+  background: var(--yqa-chip-bg, color-mix(in srgb, currentColor 12%, transparent));
+  border-radius: 18px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.yqa-picker-remove:hover {
+  background: rgba(128, 128, 128, 0.3);
+  background: var(--yqa-chip-bg-hover, color-mix(in srgb, currentColor 20%, transparent));
+}
+
+/* --- the user's own images --------------------------------------------- */
+
+.yqa-upload-cell {
+  border: 1px dashed;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  box-sizing: border-box;
+}
+
+.yqa-upload-cell svg {
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.yqa-image-cell {
+  position: relative;
+  padding: 0;
+  background: transparent;
+}
+
+.yqa-image-pick {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yqa-image-pick img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+/* The picture cells carry badges that stick out over their corners, so the
+   row needs room above and beside it — otherwise the scroll edge clips them. */
+.yqa-picker-grid.yqa-grid-custom {
+  padding: 9px 3px 0;
+  row-gap: 8px;
+}
+
+/* Adjust and delete badges, only while the pointer is on the picture. */
+.yqa-image-edit,
+.yqa-image-del {
+  position: absolute;
+  top: -2px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  outline: none;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #ff0034;
+  color: #fff;
+}
+
+.yqa-image-del { right: -2px; }
+
+/* Grey, so the red stays reserved for the one action that loses something. */
+.yqa-image-edit {
+  left: -2px;
+  background: #606060;
+}
+
+.yqa-image-cell:hover .yqa-image-edit,
+.yqa-image-cell:hover .yqa-image-del,
+.yqa-image-edit:focus-visible,
+.yqa-image-del:focus-visible {
+  display: flex;
+}
+
+.yqa-image-edit svg,
+.yqa-image-del svg {
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.yqa-mini-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+/* --- crop editor -------------------------------------------------------- */
+
+.yqa-editor {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 12px;
+  background: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 1;
+}
+
+.yqa-editor-stage {
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.yqa-editor-stage:active {
+  cursor: grabbing;
+}
+
+.yqa-editor-hint {
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.yqa-editor-zoom {
+  width: 100%;
+  accent-color: #ff0034;
+}
+
+.yqa-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+/* Lucide icons are stroke drawings — they must not inherit a fill. */
+.yqa-lucide {
+  fill: none;
+  stroke: currentColor;
+  pointer-events: none;
+  display: block;
+}
+
+/* YouTube posts a toast for every single removal; during a bulk run that
+   would bury the page. */
+html.yqa-bulk-running tp-yt-paper-toast,
+html.yqa-bulk-running yt-notification-action-renderer,
+html.yqa-bulk-running ytd-notification-action-renderer,
+html.yqa-bulk-running yt-toast-view-model,
+html.yqa-bulk-running ytd-popup-container > tp-yt-paper-toast {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ====================================================================
+   Bulk removal dialog
+   ==================================================================== */
+
+.yqa-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Roboto', 'Arial', sans-serif;
+}
+
+.yqa-modal-box {
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--yqa-surface, #fff);
+  color: var(--yqa-fg, #0f0f0f);
+  box-shadow: 0 4px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.yqa-modal-title {
+  font-size: 17px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.yqa-modal-text {
+  font-size: 14px;
+  line-height: 20px;
+  opacity: 0.85;
+}
+
+.yqa-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.yqa-modal-btn {
+  border: none;
+  outline: none;
+  border-radius: 18px;
+  height: 36px;
+  padding: 0 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--yqa-fg, currentColor);
+  background: rgba(128, 128, 128, 0.2);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.yqa-modal-btn:hover {
+  background: rgba(128, 128, 128, 0.3);
+  background: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.yqa-modal-danger {
+  background: #ff0034;
+  color: #fff;
+}
+
+.yqa-modal-danger:hover {
+  background: #d4002b;
+}
+
+/* ====================================================================
+   Quick-save bar
+   ==================================================================== */
+
+.yqa-bar {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* space-evenly gives the same gap between the buttons and at both
+     edges, whatever the icon count. */
+  /* A fixed gap (measured from the widest row) keeps every row aligned,
+     even when a badge makes one text column narrower. */
+  justify-content: flex-start;
+  gap: var(--yqa-bar-gap, 6px);
+  padding-left: var(--yqa-bar-gap, 6px);
+  box-sizing: border-box;
+  color: var(--yqa-fg, currentColor);
+  margin-left: var(--yqa-bar-left, 0px);
+  margin-right: var(--yqa-bar-right, 0px);
+  /* Auto margins centre the bar in whatever space the title leaves,
+     so one-line and multi-line titles both look right. */
+  margin-top: auto;
+  margin-bottom: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+yt-lockup-view-model:hover .yqa-bar,
+ytd-video-renderer:hover .yqa-bar,
+ytd-playlist-video-renderer:hover .yqa-bar,
+.yqa-bar:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+  /* In at once, like YouTube's own row highlight; the fade in the rule
+     above only applies on the way out. */
+  transition-duration: 0s;
+}
+
+.yqa-bar.yqa-always {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+ytd-playlist-video-renderer .yqa-bar {
+  position: relative;
+  top: var(--yqa-bar-shift, 0px);
+}
+
+.yqa-bar:empty {
+  display: none;
+}
+
+.yqa-bar-item {
+  position: relative;
+  width: 40px;
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+/* Room for the labels below the row. */
+.yqa-bar.yqa-labeled {
+  padding-bottom: 18px;
+}
+
+.yqa-bar-label {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  line-height: 14px;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  opacity: 0.7;
+  max-width: var(--yqa-label-max, 64px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
+}
+
+.yqa-bar-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s;
+  /* Not in this playlist: a permanently visible neutral circle. */
+  border: none;
+  background-color: rgba(128, 128, 128, 0.18);
+  /* 12%, or 16% in the dark theme (set from content.js with the text colour). */
+  background-color: color-mix(in srgb, currentColor var(--yqa-chip, 12%), transparent);
+}
+
+.yqa-bar-btn:hover,
+.yqa-bar-btn:focus-visible {
+  background-color: rgba(128, 128, 128, 0.35);
+  background-color: color-mix(in srgb, currentColor var(--yqa-chip-hover, 22%), transparent);
+}
+
+/* Video is already in this playlist: YouTube's button red, white glyph. */
+.yqa-bar-btn.yqa-in {
+  background-color: #ff0034;
+  color: #fff;
+}
+
+.yqa-bar-btn.yqa-in:hover,
+.yqa-bar-btn.yqa-in:focus-visible {
+  background-color: #d4002b;
+}
+
+.yqa-bar-btn.yqa-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.yqa-bar-btn svg {
+  fill: currentColor;
+  pointer-events: none;
+  display: block;
+}
+
+.yqa-bar-btn .yqa-lucide,
+.yqa-mini-btn .yqa-lucide {
+  fill: none;
+}
+
+.yqa-bar-emoji {
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.yqa-bar-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}

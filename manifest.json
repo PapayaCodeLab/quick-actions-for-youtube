@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Quick Actions for YouTube – History & Playlists",
+  "short_name": "Quick Actions",
+  "version": "1.0.1",
+  "description": "Delete videos from your YouTube watch history in one click and save them to pinned playlists. 100% local, no data collection.",
+  "author": "Papaya Code",
+  "homepage_url": "https://github.com/PapayaCodeLab/quick-actions-for-youtube",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons.json"
+      ],
+      "matches": [
+        "https://www.youtube.com/*"
+      ]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "i18n.js",
+        "emoji-data.js",
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ]
+}
