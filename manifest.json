@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Quick Actions for YouTube – History & Playlists",
+  "name": "Quick Actions for YouTube – History, Speed, Screenshots & Thumbnails",
   "short_name": "Quick Actions",
-  "version": "1.0.1",
-  "description": "Delete videos from your YouTube watch history in one click and save them to pinned playlists. 100% local, no data collection.",
+  "version": "1.1.0",
+  "description": "One-click history removal, pinned playlists, speed controls, screenshots and thumbnail downloads for YouTube. 100% local.",
   "author": "Papaya Code",
   "homepage_url": "https://github.com/PapayaCodeLab/quick-actions-for-youtube",
   "icons": {

@@ -26,6 +26,12 @@ OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
+## Material Icons
+
+The player icons (rewind, advance, minus, camera, image) are path data from Google's
+[Material Icons](https://fonts.google.com/icons), licensed under the
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
 ## Buy Me a Coffee
 
 `assets/bmc-button.png` is the official "Buy me a coffee" button provided by

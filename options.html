@@ -11,6 +11,7 @@
       --muted: #606060;
       --line: rgba(0, 0, 0, 0.1);
       --accent: #f00;
+      --field: rgba(0, 0, 0, 0.16);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -18,6 +19,7 @@
         --fg: #f1f1f1;
         --muted: #aaa;
         --line: rgba(255, 255, 255, 0.15);
+        --field: rgba(255, 255, 255, 0.22);
       }
     }
     body {
@@ -48,6 +50,27 @@
     }
     input[type="checkbox"]:checked { background: var(--accent); }
     input[type="checkbox"]:checked::after { transform: translateX(18px); }
+
+    /* Shortcut table, indented to line up with the switch labels
+       (40px switch + 14px gap). */
+    .keys { display: grid; gap: 8px; margin: 2px 0 10px 54px; transition: opacity .15s; }
+    .keys.off { opacity: .4; pointer-events: none; }
+    .key-row { display: grid; grid-template-columns: 1fr 76px 96px; gap: 10px;
+               align-items: center; }
+    .key-head { color: var(--muted); font-size: 12px; margin-bottom: -2px; }
+    .key-head span + span { text-align: center; }
+    .keycap, .amount { box-sizing: border-box; height: 34px; border-radius: 8px;
+                       border: 1px solid var(--field); background: transparent;
+                       color: var(--fg); font: inherit; }
+    .keycap { padding: 0 6px; font-weight: 600; cursor: pointer; }
+    .keycap.empty { color: var(--muted); font-weight: 400; }
+    .keycap.listening { border-color: var(--accent); color: var(--accent);
+                        font-size: 12px; font-weight: 500; }
+    .keycap:focus-visible, .amount:focus-within { border-color: var(--accent); outline: none; }
+    .amount { display: flex; align-items: center; padding: 0 10px; cursor: text; }
+    .amount input { flex: 1; min-width: 0; padding: 0; border: 0; background: none;
+                    color: inherit; font: inherit; text-align: right; outline: none; }
+    .amount .unit { margin-left: 4px; color: var(--muted); }
     /* The gap above this rule matches the one between the two sections:
        8px row padding + 18px section padding. */
     .tail { padding-top: 18px; border-top: 1px solid var(--line); }
@@ -105,7 +128,52 @@
       </div>
     </section>
 
-
+    <section>
+      <h2>Video player</h2>
+      <div class="row">
+        <input type="checkbox" id="speedControls">
+        <label for="speedControls">Speed controls</label>
+      </div>
+      <div class="keys" id="keys">
+        <div class="key-row key-head"><span></span><span>Key</span><span>Amount</span></div>
+        <div class="key-row">
+          <span>Decrease speed</span>
+          <button type="button" class="keycap" data-act="slower"></button>
+          <label class="amount"><input type="text" inputmode="decimal" data-act="slower"
+            aria-label="Decrease speed amount"><span class="unit">×</span></label>
+        </div>
+        <div class="key-row">
+          <span>Increase speed</span>
+          <button type="button" class="keycap" data-act="faster"></button>
+          <label class="amount"><input type="text" inputmode="decimal" data-act="faster"
+            aria-label="Increase speed amount"><span class="unit">×</span></label>
+        </div>
+        <div class="key-row">
+          <span>Preferred speed</span>
+          <button type="button" class="keycap" data-act="preferred"></button>
+          <label class="amount"><input type="text" inputmode="decimal" data-act="preferred"
+            aria-label="Preferred speed"><span class="unit">×</span></label>
+        </div>
+        <div class="key-row">
+          <span>Rewind</span>
+          <button type="button" class="keycap" data-act="rewind"></button>
+          <label class="amount"><input type="text" inputmode="decimal" data-act="rewind"
+            aria-label="Rewind amount"><span class="unit">s</span></label>
+        </div>
+        <div class="key-row">
+          <span>Advance</span>
+          <button type="button" class="keycap" data-act="advance"></button>
+          <label class="amount"><input type="text" inputmode="decimal" data-act="advance"
+            aria-label="Advance amount"><span class="unit">s</span></label>
+        </div>
+      </div>
+      <div class="row">
+        <input type="checkbox" id="screenshotButton">
+        <label for="screenshotButton">Screenshot button
+          <span class="hint">Saves the current frame as a PNG, named after the channel and the video title.</span>
+        </label>
+      </div>
+    </section>
 
     <div class="tail">
       <p class="stats" id="stats" hidden></p>

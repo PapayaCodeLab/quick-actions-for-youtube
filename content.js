@@ -7,6 +7,10 @@
 //  3. Quick-save bar under each video: one click toggles the video in a pinned
 //     playlist (add / remove); playlists that already contain the video are
 //     highlighted.
+//  4. Speed controls in the player: a speed readout with rewind, slower,
+//     faster and advance buttons beside the time, plus keyboard shortcuts.
+//  5. Screenshot button in the player: saves the current video frame.
+//  6. "Download thumbnail" in the three-dot menu of every video (not Shorts).
 //
 // All actions are performed through YouTube's own UI (the native menu is
 // opened invisibly and the native menu item is clicked), so YouTube itself
@@ -125,6 +129,16 @@
     removeAllLeft: (n) => t('removeAllLeft', n),
     removeAllRunning: (n) => t('removeAllRunning', n),
     removeAllDone: (n) => t('removeAllDone', n),
+    get speedDown() { return t('speedDown'); },
+    get speedUp() { return t('speedUp'); },
+    seekBack: (n) => t('seekBack', n),
+    seekForward: (n) => t('seekForward', n),
+    get screenshot() { return t('screenshot'); },
+    get screenshotSaved() { return t('screenshotSaved'); },
+    get screenshotFailed() { return t('screenshotFailed'); },
+    get screenshotBlack() { return t('screenshotBlack'); },
+    get thumbnail() { return t('thumbnail'); },
+    get thumbnailFailed() { return t('thumbnailFailed'); },
   };
 
   // ------------------------------------------------------------- helpers
@@ -404,6 +418,8 @@
     showOnPlaylists: true,
     showOnWatchLater: true,
     alwaysShow: true,
+    speedControls: true,
+    screenshotButton: true,
   };
   let customIcons = [];   // the user's own uploaded images
   // Symbol of a playlist that was unpinned, by playlist name. Pinning it
@@ -473,6 +489,7 @@
         updateAllBars();
       }
       refreshSnapshots();
+      injectPlayerControls();
     } else if (ev.data.type === 'YQA_ICON_DATA') {
       iconLibrary = ev.data.icons || null;
       if (onIconsReady) { const fn = onIconsReady; onIconsReady = null; fn(); }
@@ -2057,6 +2074,644 @@
     document.querySelectorAll('toggleable-list-item-view-model')
       .forEach(injectRowActions);
 
+  // ------------------------------------------------------ player controls
+
+  // A speed readout with rewind / slower / faster / advance buttons beside
+  // the time, a screenshot button left of the right-hand control pill, and
+  // keyboard shortcuts for the four speed and skip actions. The styling
+  // (styles.css) reads the player's own custom properties, so it follows
+  // YouTube between the compact pill layout and the big fullscreen one.
+  const SPEED_ACTIONS = ['slower', 'faster', 'preferred', 'rewind', 'advance'];
+  const DEFAULT_KEYS = { slower: 's', faster: 'd', preferred: 'q', rewind: 'w', advance: 'e' };
+  const DEFAULT_AMOUNTS = { slower: 0.1, faster: 0.1, preferred: 1.4, rewind: 5, advance: 5 };
+  const RATE_MIN = 0.1;
+  const RATE_MAX = 16;
+
+  // Material Icons (Apache 2.0), outlined like the player's own icons.
+  const REWIND_PATH = 'M17.59 18 19 16.59 14.42 12 19 7.41 17.59 6l-6 6 6 6z' +
+    'M11 18l1.41-1.41L7.83 12l4.58-4.59L11 6l-6 6 6 6z';
+  const ADVANCE_PATH = 'M6.41 6 5 7.41 9.58 12 5 16.59 6.41 18l6-6-6-6z' +
+    'M13 6l-1.41 1.41L16.17 12l-4.58 4.59L13 18l6-6-6-6z';
+  const MINUS_PATH = 'M5 11h14v2H5z';
+  const CAMERA_PATH = 'M14.12 4l1.83 2H20v12H4V6h4.05l1.83-2h4.24M15 2H9L7.17 ' +
+    '4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2' +
+    'h-3.17L15 2zm-3 7c1.65 0 3 1.35 3 3s-1.35 3-3 3-3-1.35-3-3 1.35-3 3-3m0' +
+    '-2c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z';
+
+  const actionKey = (act) => {
+    const keys = settings.keys;
+    return keys && typeof keys[act] === 'string' ? keys[act] : DEFAULT_KEYS[act];
+  };
+  const actionAmount = (act) => {
+    const n = Number(settings.amounts && settings.amounts[act]);
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_AMOUNTS[act];
+  };
+  // Undefined until the stored settings arrive — both features default to on.
+  const speedOn = () => settings.speedControls !== false;
+  const shotOn = () => settings.screenshotButton !== false;
+
+  const moviePlayer = () => document.getElementById('movie_player');
+  function mainVideo() {
+    const player = moviePlayer();
+    return player && player.querySelector('video.html5-main-video, video');
+  }
+  // Ads are left alone: no speeding them up, no skipping through them.
+  const adShowing = () => {
+    const player = moviePlayer();
+    return !!player && player.classList.contains('ad-showing');
+  };
+  const roundRate = (r) => Math.round(r * 100) / 100;
+  const formatRate = (r) => roundRate(r).toFixed(2);
+  const formatAmount = (n) => String(roundRate(n));
+  const keyName = (key) => (key.length === 1 ? key.toUpperCase()
+    : key.charAt(0).toUpperCase() + key.slice(1));
+
+  // YouTube applies its own remembered speed whenever a new video loads. The
+  // speed picked last — here or in YouTube's own menu — is put back on top,
+  // so it carries over to the next video.
+  let wantedRate = null;
+  // The speed before the preferred-speed key was pressed, to go back to.
+  let rateBeforePreferred = null;
+  let loading = false;
+  let loadingTimer = 0;
+  const boundVideos = new WeakSet();
+
+  function enforceRate(video) {
+    if (wantedRate == null || adShowing()) return;
+    if (Math.abs(video.playbackRate - wantedRate) > 0.001) {
+      video.playbackRate = wantedRate;
+    }
+  }
+
+  function bindVideo(video) {
+    if (boundVideos.has(video)) return;
+    boundVideos.add(video);
+    video.addEventListener('loadstart', () => {
+      loading = true;
+      clearTimeout(loadingTimer);
+      // A video that stays paused never fires "playing"; stop waiting.
+      loadingTimer = setTimeout(() => { loading = false; }, 4000);
+    });
+    video.addEventListener('playing', () => {
+      if (!loading) return;
+      clearTimeout(loadingTimer);
+      loadingTimer = setTimeout(() => {
+        loading = false;
+        enforceRate(video);
+      }, 400);
+    });
+    video.addEventListener('ratechange', () => {
+      if (!adShowing()) {
+        if (loading) enforceRate(video);
+        else wantedRate = roundRate(video.playbackRate);
+      }
+      updateSpeedLabel();
+    });
+  }
+
+  function setRate(rate) {
+    const video = mainVideo();
+    if (!video || adShowing()) return null;
+    const next = Math.min(RATE_MAX, Math.max(RATE_MIN, roundRate(rate)));
+    wantedRate = next;
+    video.playbackRate = next;
+    updateSpeedLabel();
+    return next;
+  }
+
+  // Short confirmation inside the player — it stays visible in fullscreen,
+  // where the control bar is usually hidden while a shortcut is used.
+  let noteTimer = 0;
+  function playerNote(text, ms) {
+    const player = moviePlayer();
+    if (!player) return;
+    let note = player.querySelector('.yqa-note');
+    if (!note) {
+      note = el('div', 'yqa-note');
+      player.appendChild(note);
+    }
+    note.textContent = text;
+    note.classList.add('yqa-note-on');
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => note.classList.remove('yqa-note-on'), ms || 900);
+  }
+
+  // A held W / E key repeats about 30 times a second. Every seek makes the
+  // player drop its buffer and fetch again, so the presses are folded into
+  // one seek per 150 ms that goes the whole distance.
+  const SEEK_GAP = 150;
+  let seekTarget = null;
+  let seekTimer = 0;
+  let lastSeek = { to: 0, at: -Infinity };
+
+  function flushSeek() {
+    if (seekTarget == null) { seekTimer = 0; return; }
+    const target = seekTarget;
+    seekTarget = null;
+    lastSeek = { to: target, at: performance.now() };
+    const player = moviePlayer();
+    // The player's own seek keeps its buffering and progress bar in step.
+    if (player && typeof player.seekTo === 'function') player.seekTo(target, true);
+    else {
+      const video = mainVideo();
+      if (video) video.currentTime = target;
+    }
+    seekTimer = setTimeout(flushSeek, SEEK_GAP);
+  }
+
+  function queueSeek(video, delta) {
+    // Right after a seek the video may still report its old position.
+    const from = seekTarget != null ? seekTarget
+      : performance.now() - lastSeek.at < 700 ? lastSeek.to : video.currentTime;
+    const end = Number.isFinite(video.duration) ? video.duration : Infinity;
+    seekTarget = Math.min(end, Math.max(0, from + delta));
+    if (!seekTimer) flushSeek();
+  }
+
+  function runPlayerAction(act, fromKey) {
+    const video = mainVideo();
+    if (!video || adShowing()) return;
+    const amount = actionAmount(act);
+    if (act === 'preferred') {
+      // First press: jump to the preferred speed. Pressed again while still
+      // at that speed: back to where it was (normal speed if unknown).
+      const current = roundRate(video.playbackRate);
+      let next = amount;
+      if (Math.abs(current - roundRate(amount)) < 0.001) {
+        next = rateBeforePreferred != null ? rateBeforePreferred : 1;
+        rateBeforePreferred = null;
+      } else {
+        rateBeforePreferred = current;
+      }
+      const rate = setRate(next);
+      if (fromKey && rate != null) playerNote(formatRate(rate) + '×');
+      return;
+    }
+    if (act === 'slower' || act === 'faster') {
+      const rate = setRate(video.playbackRate + (act === 'faster' ? amount : -amount));
+      if (fromKey && rate != null) playerNote(formatRate(rate) + '×');
+      return;
+    }
+    const delta = act === 'advance' ? amount : -amount;
+    queueSeek(video, delta);
+    if (fromKey) playerNote((delta < 0 ? '−' : '+') + formatAmount(amount) + ' s');
+  }
+
+  function isTyping(ev) {
+    const node = ev.composedPath ? ev.composedPath()[0] : ev.target;
+    if (!node || node.nodeType !== 1) return false;
+    return node.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(node.tagName);
+  }
+
+  window.addEventListener('keydown', (ev) => {
+    if (!speedOn() || ev.isComposing || !ev.key) return;
+    // Modified keys belong to the browser and to YouTube (Shift+N, Shift+>…).
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ev.shiftKey) return;
+    if (isTyping(ev)) return;
+    const key = ev.key.toLowerCase();
+    const act = SPEED_ACTIONS.find((a) => actionKey(a) === key);
+    if (!act) return;
+    const video = mainVideo();
+    // The player stays in the page, hidden, on non-watch pages.
+    if (!video || !isVisible(video)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    runPlayerAction(act, true);
+  }, true);
+
+  function playerButton(className, path) {
+    const btn = el('button', className);
+    btn.type = 'button';
+    btn.appendChild(svgIcon(path, 24));
+    // Keep the focus on the player: a focused button would take the space
+    // bar that YouTube uses for play / pause.
+    btn.addEventListener('mousedown', (ev) => ev.preventDefault());
+    return btn;
+  }
+
+  function buildSpeedPill() {
+    const pill = el('div', 'yqa-speed');
+    pill.appendChild(el('span', 'yqa-speed-value', '1.00'));
+    const paths = {
+      rewind: REWIND_PATH, slower: MINUS_PATH, faster: PLUS_PATH, advance: ADVANCE_PATH,
+    };
+    for (const act of ['rewind', 'slower', 'faster', 'advance']) {
+      const btn = playerButton('yqa-pbtn', paths[act]);
+      btn.dataset.act = act;
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        runPlayerAction(act, false);
+      });
+      pill.appendChild(btn);
+    }
+    return pill;
+  }
+
+  // Tooltips name the shortcut and the amount, so they are redone when
+  // either changes in the settings.
+  function labelSpeedPill(pill) {
+    const sig = SPEED_ACTIONS.map((a) => actionKey(a) + ':' + actionAmount(a))
+      .join('|') + '|' + LANG;
+    if (pill.dataset.sig === sig) return;
+    pill.dataset.sig = sig;
+    const text = {
+      slower: T.speedDown,
+      faster: T.speedUp,
+      rewind: T.seekBack(formatAmount(actionAmount('rewind'))),
+      advance: T.seekForward(formatAmount(actionAmount('advance'))),
+    };
+    pill.querySelectorAll('.yqa-pbtn').forEach((btn) => {
+      const key = actionKey(btn.dataset.act);
+      const label = text[btn.dataset.act] + (key ? ' (' + keyName(key) + ')' : '');
+      btn.title = label;
+      btn.setAttribute('aria-label', label);
+    });
+  }
+
+  function updateSpeedLabel() {
+    const value = document.querySelector('#movie_player .yqa-speed-value');
+    const video = mainVideo();
+    if (!value || !video) return;
+    const text = formatRate(video.playbackRate);
+    // Only on change: rewriting the text is a DOM mutation, which would
+    // trigger the next scan.
+    if (value.textContent !== text) value.textContent = text;
+  }
+
+  // Characters no file system accepts in a name, plus control characters.
+  const FILE_UNSAFE = '\\/:*?"<>|';
+  const fileSafe = (text) => Array.from(text)
+    .map((ch) => (ch.charCodeAt(0) < 32 || FILE_UNSAFE.includes(ch) ? ' ' : ch))
+    .join('');
+
+  function screenshotName() {
+    const player = moviePlayer();
+    let data = null;
+    try {
+      data = player && typeof player.getVideoData === 'function'
+        ? player.getVideoData() : null;
+    } catch (_) { /* fall back to the page */ }
+    const pick = (s) => (typeof s === 'string' ? s.trim() : '');
+    const pageText = (sel) => {
+      const node = document.querySelector(sel);
+      return node ? pick(node.textContent) : '';
+    };
+    // What the page shows first: YouTube may display a translated title,
+    // and the file should carry the one the viewer sees.
+    const author = pageText('ytd-watch-metadata ytd-channel-name a') ||
+      pick(data && data.author);
+    const title = pageText('ytd-watch-metadata h1') || pick(data && data.title);
+    const name = fileSafe([author, title].filter(Boolean).join(' - '))
+      .replace(/\s+/g, ' ')
+      .replace(/^[.\s]+|[.\s]+$/g, '')
+      .slice(0, 180);
+    return (name || 'YouTube screenshot') + '.png';
+  }
+
+  function looksBlack(canvas) {
+    const probe = document.createElement('canvas');
+    probe.width = 32;
+    probe.height = 18;
+    const ctx = probe.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(canvas, 0, 0, 32, 18);
+    const d = ctx.getImageData(0, 0, 32, 18).data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] > 12 || d[i + 1] > 12 || d[i + 2] > 12) return false;
+    }
+    return true;
+  }
+
+  // The frame is taken straight from the video element, so nothing the
+  // player draws on top (controls, captions, cards) ends up in the image.
+  async function takeScreenshot() {
+    const video = mainVideo();
+    if (!video || !video.videoWidth || adShowing()) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    let blob = null;
+    try {
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Copy-protected videos (EME) hand out black frames instead of an error.
+      if (video.mediaKeys && looksBlack(canvas)) {
+        playerNote(T.screenshotBlack, 2600);
+        return;
+      }
+      blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    } catch (_) { /* reported below */ }
+    if (!blob) {
+      playerNote(T.screenshotFailed, 2000);
+      return;
+    }
+    saveBlob(blob, screenshotName());
+    playerNote(T.screenshotSaved, 1200);
+  }
+
+  function buildShotButton() {
+    const btn = playerButton('yqa-shot', CAMERA_PATH);
+    btn.title = T.screenshot;
+    btn.setAttribute('aria-label', T.screenshot);
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      takeScreenshot();
+    });
+    return btn;
+  }
+
+  // Called from every scan, so it must stay cheap when nothing is missing.
+  function injectPlayerControls() {
+    const player = moviePlayer();
+    if (!player) return;
+    const video = mainVideo();
+    if (video) bindVideo(video);
+
+    let pill = player.querySelector('.yqa-speed');
+    if (!speedOn()) {
+      if (pill) pill.remove();
+    } else {
+      const time = player.querySelector('.ytp-left-controls > .ytp-time-display');
+      if (time && !pill) {
+        pill = buildSpeedPill();
+        time.after(pill);
+      }
+      if (pill) {
+        labelSpeedPill(pill);
+        updateSpeedLabel();
+      }
+    }
+
+    const shot = player.querySelector('.yqa-shot');
+    if (!shotOn()) {
+      if (shot) shot.remove();
+    } else if (!shot) {
+      const right = player.querySelector('.ytp-chrome-controls > .ytp-right-controls');
+      if (right) right.before(buildShotButton());
+    }
+  }
+
+  // --------------------------------------------------- thumbnail download
+
+  // "Download thumbnail" in the three-dot menu of every video: home page,
+  // search, channel pages and the sidebar next to the player. The menu does
+  // not say which video it belongs to, so the card whose menu button the
+  // user just pressed is remembered, and the item is added once the menu is
+  // on screen. Two menu types exist: the current sheet (lockup cards) and
+  // YouTube's older Polymer popup (search results, playlist rows).
+  const THUMB_ITEM_CLASS = 'yqa-thumb-item';
+  // Material Icons "image" (Apache 2.0).
+  const IMAGE_PATH = 'M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 ' +
+    '2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12' +
+    'l-3.86-5.14z';
+  // The new item goes right after "Download", or after "Share" where a menu
+  // has no download entry.
+  const DOWNLOAD_ICON_PREFIXES = ['M12 2a1 1 0 00'];
+  const SHARE_ICON_PREFIXES = ['M10 3.158V7.51'];
+  const CARD_SELECTOR = 'yt-lockup-view-model, ytd-video-renderer, ' +
+    'ytd-compact-video-renderer, ytd-grid-video-renderer, ' +
+    'ytd-playlist-video-renderer';
+  const CARD_MENU_SELECTOR = '.ytLockupMetadataViewModelMenuButton, ' +
+    'ytd-menu-renderer';
+  // Largest first; a size YouTube does not have answers 404. Shorts are left
+  // out on purpose: their upright pictures are frames from the video, not
+  // the thumbnail the creator chose.
+  const THUMB_SIZES = ['maxresdefault', 'sddefault', 'hqdefault'];
+  // A menu showing up later than this was not opened from the remembered card.
+  const MENU_WINDOW = 4000;
+  // The menu can be built before it is shown. Showing it only changes its
+  // style, which no DOM observer reports, so it is looked for for a moment
+  // after every press.
+  const MENU_POLL_MS = 60;
+  const MENU_POLL_FOR = 1500;
+
+  let menuCard = null;
+  let menuPoll = 0;
+
+  const cleanText = (node) =>
+    (node ? node.textContent.replace(/\s+/g, ' ').trim() : '');
+  const iconOf = (node) => {
+    const path = node.querySelector('svg path');
+    return path ? path.getAttribute('d') || '' : '';
+  };
+  const hasIcon = (node, prefixes) =>
+    prefixes.some((pre) => iconOf(node).startsWith(pre));
+
+  function cardVideo(card) {
+    const watch = card.querySelector('a[href*="/watch?v="]');
+    if (!watch) return null;
+    let id = '';
+    try {
+      id = new URL(watch.getAttribute('href'), location.origin)
+        .searchParams.get('v') || '';
+    } catch (_) { id = ''; }
+    if (!/^[\w-]{6,20}$/.test(id)) return null;
+
+    const title = cleanText(card.querySelector('#video-title')) ||
+      cleanText(card.querySelector('h3'));
+    // The channel: a link on the card (home, search), the page header on a
+    // channel's own pages, whose cards leave it out, or the first metadata
+    // row in the sidebar, where it is plain text.
+    const onChannelPage = /^\/(@|channel\/|c\/|user\/)/.test(location.pathname);
+    const rows = card.querySelectorAll('.ytContentMetadataViewModelMetadataRow');
+    const author =
+      Array.from(card.querySelectorAll(
+        'ytd-channel-name a, a[href^="/@"], a[href^="/channel/"]'))
+        .map(cleanText).find(Boolean) ||
+      (onChannelPage
+        ? cleanText(document.querySelector('yt-page-header-view-model h1')) : '') ||
+      (rows.length > 1 ? cleanText(rows[0]) : '');
+    return { id, name: [author, title].filter(Boolean).join(' - ') };
+  }
+
+  function removeThumbItems() {
+    document.querySelectorAll('.' + THUMB_ITEM_CLASS)
+      .forEach((node) => node.remove());
+  }
+
+  function rememberMenuCard(ev) {
+    // Only real presses: the extension opens menus itself in the background.
+    if (!ev.isTrusted) return;
+    const target = ev.target instanceof Element ? ev.target : null;
+    const menu = target && target.closest(CARD_MENU_SELECTOR);
+    const card = menu && menu.closest(CARD_SELECTOR);
+    if (!card) return;
+    // A new menu is about to be built. An item left over from the last one
+    // must not be inside the list when YouTube renders it again.
+    removeThumbItems();
+    clearInterval(menuPoll);
+    const video = cardVideo(card);
+    menuCard = video
+      ? Object.assign(video, { button: menu, at: performance.now() }) : null;
+    if (!menuCard) return;
+    const started = performance.now();
+    menuPoll = setInterval(() => {
+      if (scanVideoMenu() || performance.now() - started > MENU_POLL_FOR) {
+        clearInterval(menuPoll);
+      }
+    }, MENU_POLL_MS);
+  }
+  window.addEventListener('pointerdown', rememberMenuCard, true);
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') rememberMenuCard(ev);
+  }, true);
+  document.addEventListener('iron-overlay-opened', () => { scanVideoMenu(); }, true);
+  document.addEventListener('iron-overlay-closed', removeThumbItems, true);
+
+  // Returns true once the item is in the open menu.
+  function scanVideoMenu() {
+    if (!menuCard || document.documentElement.classList.contains(HIDE_CLASS)) {
+      return false;
+    }
+    if (performance.now() - menuCard.at > MENU_WINDOW) return false;
+    const pc = document.querySelector('ytd-popup-container');
+    if (!pc) return false;
+    if (Array.from(pc.querySelectorAll('.' + THUMB_ITEM_CLASS)).some(isVisible)) {
+      return true;
+    }
+    const sheet = Array.from(
+      pc.querySelectorAll('yt-sheet-view-model yt-list-view-model')).find(isVisible);
+    if (sheet) return addSheetItem(sheet);
+    const listbox = Array.from(
+      pc.querySelectorAll('ytd-menu-popup-renderer tp-yt-paper-listbox')).find(isVisible);
+    if (listbox) return addLegacyItem(listbox);
+    return false;
+  }
+
+  function placeThumbItem(items, item, parent) {
+    const anchor = items.find((node) => hasIcon(node, DOWNLOAD_ICON_PREFIXES)) ||
+      items.find((node) => hasIcon(node, SHARE_ICON_PREFIXES));
+    if (anchor) anchor.after(item);
+    else parent.appendChild(item);
+  }
+
+  function wireThumbItem(item) {
+    const card = menuCard;
+    // The older popup selects its entries through Polymer's tap handling on
+    // the list. Stopping the raw events here keeps this entry out of it.
+    for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup',
+      'touchstart', 'touchend']) {
+      item.addEventListener(type, (ev) => ev.stopPropagation());
+    }
+    item.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      closeMenu();
+      removeThumbItems();
+      downloadThumbnail(card);
+    });
+  }
+
+  // Current menus: a copy of a real entry, so spacing, font and hover match
+  // exactly; only the icon and the text are swapped.
+  function addSheetItem(list) {
+    const items = Array.from(list.querySelectorAll(':scope > yt-list-item-view-model'));
+    // Only a video's own menu: it always offers "Save to playlist".
+    if (!items.some((node) => hasIcon(node, SAVE_ICON_PREFIXES))) return false;
+    const template = items.find((node) => hasIcon(node, SHARE_ICON_PREFIXES)) || items[0];
+    const layout = template && template.firstElementChild;
+    if (!layout) return false;
+
+    const item = el('div', 'ytListItemViewModelHost ' + THUMB_ITEM_CLASS);
+    const wrapper = layout.cloneNode(true);
+    item.appendChild(wrapper);
+    // YouTube's grey hover is a class its own script sets on mouse-over
+    // (.ytListItemViewModelHovered). A copy has no such script, so the class
+    // is set here, and dropped in case the template was hovered while copied.
+    wrapper.classList.remove('ytListItemViewModelHovered');
+    item.addEventListener('mouseenter', () =>
+      wrapper.classList.add('ytListItemViewModelHovered'));
+    item.addEventListener('mouseleave', () =>
+      wrapper.classList.remove('ytListItemViewModelHovered'));
+    const oldSvg = item.querySelector('svg');
+    if (oldSvg) {
+      const svg = svgIcon(IMAGE_PATH, 24);
+      for (const attr of Array.from(oldSvg.attributes)) {
+        if (attr.name !== 'viewBox') svg.setAttribute(attr.name, attr.value);
+      }
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.querySelector('path').setAttribute('fill', 'currentColor');
+      oldSvg.replaceWith(svg);
+    }
+    const label = item.querySelector('.ytListItemViewModelTitle');
+    if (label) label.textContent = T.thumbnail;
+    item.querySelectorAll('[aria-label]')
+      .forEach((node) => node.setAttribute('aria-label', T.thumbnail));
+    wireThumbItem(item);
+    placeThumbItem(items, item, list);
+    return true;
+  }
+
+  function copyStyle(from, to, props) {
+    if (!from) return;
+    const style = getComputedStyle(from);
+    for (const prop of props) to.style.setProperty(prop, style.getPropertyValue(prop));
+  }
+
+  // Older menus are Polymer elements, which cannot be copied safely (a copy
+  // stamps its template a second time). The entry is built from plain
+  // elements, with its measurements and colours read off a real one.
+  function addLegacyItem(listbox) {
+    const items = Array.from(listbox.children)
+      .filter((node) => node.querySelector('tp-yt-paper-item'));
+    if (!items.some((node) => hasIcon(node, SAVE_ICON_PREFIXES))) return false;
+    const template = items.find((node) => hasIcon(node, SHARE_ICON_PREFIXES)) || items[0];
+
+    const item = el('div', THUMB_ITEM_CLASS + ' yqa-thumb-legacy');
+    item.setAttribute('role', 'menuitem');
+    copyStyle(template.querySelector('tp-yt-paper-item'), item, ['min-height',
+      'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+      'font-family', 'color']);
+    const iconBox = el('span', 'yqa-thumb-icon');
+    copyStyle(template.querySelector('yt-icon'), iconBox,
+      ['width', 'height', 'margin-right', 'color']);
+    const svg = svgIcon(IMAGE_PATH, 24);
+    svg.querySelector('path').setAttribute('fill', 'currentColor');
+    iconBox.appendChild(svg);
+    const label = el('span', 'yqa-thumb-label', T.thumbnail);
+    copyStyle(template.querySelector('yt-formatted-string'), label,
+      ['font-size', 'font-weight', 'line-height', 'letter-spacing', 'color']);
+    item.append(iconBox, label);
+    wireThumbItem(item);
+    placeThumbItem(items, item, listbox);
+    return true;
+  }
+
+  async function downloadThumbnail(card) {
+    for (const size of THUMB_SIZES) {
+      let blob = null;
+      try {
+        // i.ytimg.com allows any origin (Access-Control-Allow-Origin: *),
+        // so no extra permission is needed. No cookies go along.
+        const res = await fetch('https://i.ytimg.com/vi/' + card.id + '/' +
+          size + '.jpg', { credentials: 'omit' });
+        if (res.ok) blob = await res.blob();
+      } catch (_) { blob = null; }
+      if (!blob || !blob.size) continue;
+      const name = fileSafe(card.name)
+        .replace(/\s+/g, ' ')
+        .replace(/^[.\s]+|[.\s]+$/g, '')
+        .slice(0, 180);
+      saveBlob(blob, (name || card.id) + '.jpg');
+      return;
+    }
+    if (card.button && card.button.isConnected) {
+      showHint(card.button, T.thumbnailFailed, 2500);
+    }
+  }
+
+  // A same-origin blob link honours the file name and needs no downloads
+  // permission.
+  function saveBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = el('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
+
   // ---------------------------------------------------- quick-save bar
 
   // One click toggles the video in the pinned playlist: added when it is not
@@ -2583,6 +3238,9 @@
       syncSnapshotFromPage();
     }
     scanDialog();
+    // The player can be on any page (watch page, miniplayer).
+    injectPlayerControls();
+    scanVideoMenu();
 
     const listId = currentListId();
 
@@ -2661,6 +3319,7 @@
       }
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
+  setInterval(injectPlayerControls, 1000);
   window.addEventListener('yt-navigate-finish', () => {
     // Membership and snapshots are keyed by video / playlist id, so they
     // stay valid across navigation — only the DOM has to be re-scanned.

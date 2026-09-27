@@ -27,6 +27,19 @@ developer and not to any third party.
 - No network requests to any server operated by the developer. The extension has
   no backend.
 
+## Screenshots
+
+The screenshot button copies the current video frame inside your browser and
+saves it straight to your downloads folder. The image is never uploaded
+anywhere.
+
+## Thumbnails
+
+"Download thumbnail" in a video's menu loads that video's thumbnail from
+YouTube's own image server (i.ytimg.com), the same picture YouTube is already
+showing, and saves it straight to your downloads folder. Nothing is sent
+anywhere else.
+
 ## Permissions and why they are needed
 
 - **`storage`** — to save your pinned playlists, their icons and your settings on

@@ -37,6 +37,18 @@
     showOnPlaylists: true,   // quick-save bar on playlist pages
     showOnWatchLater: true,  // quick-save bar in Watch later
     alwaysShow: true,        // icons visible without hovering the video
+    speedControls: true,     // speed pill in the player + its shortcuts
+    screenshotButton: true,  // screenshot button in the player
+  };
+
+  // Keyboard shortcuts of the speed controls: one key per action ('' = none)
+  // and how far each one goes (speed steps, seconds).
+  const ACTIONS = ['slower', 'faster', 'preferred', 'rewind', 'advance'];
+  const DEFAULT_KEYS = { slower: 's', faster: 'd', preferred: 'q', rewind: 'w', advance: 'e' };
+  const DEFAULT_AMOUNTS = { slower: 0.1, faster: 0.1, preferred: 1.4, rewind: 5, advance: 5 };
+  const AMOUNT_RANGE = {
+    slower: [0.01, 4], faster: [0.01, 4], preferred: [0.1, 16],
+    rewind: [0.1, 600], advance: [0.1, 600],
   };
 
   const sanitizePins = (pins) => {
@@ -98,10 +110,20 @@
 
   const sanitizeSettings = (settings) => {
     const out = Object.assign({}, DEFAULT_SETTINGS);
-    if (settings && typeof settings === 'object') {
-      for (const key of Object.keys(DEFAULT_SETTINGS)) {
-        if (typeof settings[key] === 'boolean') out[key] = settings[key];
-      }
+    const src = settings && typeof settings === 'object' ? settings : {};
+    for (const key of Object.keys(DEFAULT_SETTINGS)) {
+      if (typeof src[key] === 'boolean') out[key] = src[key];
+    }
+    out.keys = {};
+    out.amounts = {};
+    for (const action of ACTIONS) {
+      const key = src.keys && src.keys[action];
+      out.keys[action] = typeof key === 'string' && key.length <= 20
+        ? key.toLowerCase() : DEFAULT_KEYS[action];
+      const amount = Number(src.amounts && src.amounts[action]);
+      const [lo, hi] = AMOUNT_RANGE[action];
+      out.amounts[action] = Number.isFinite(amount) && amount >= lo && amount <= hi
+        ? amount : DEFAULT_AMOUNTS[action];
     }
     return out;
   };
